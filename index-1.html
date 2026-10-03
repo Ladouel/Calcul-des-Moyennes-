@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#123b5d">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg">
+<title>Moyennes — Cahier de notes</title>
+<style>
+:root{--b:#123b5d;--a:#f0b429;--bg:#f3f1ea;--c:#fff;--t:#1b2530;--m:#66707c;--l:#d9dde3;--r:#b3261e}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.4 Georgia,'Times New Roman',serif;background:var(--bg);color:var(--t);padding-bottom:env(safe-area-inset-bottom)}
+header{background:var(--b);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0;flex:1}
+button,select,input,textarea{font:inherit}
+.btn{background:var(--b);color:#fff;border:0;border-radius:6px;padding:9px 13px;cursor:pointer}
+.btn.s{background:#e4e9ef;color:var(--b)}
+.btn.on{background:var(--a);color:#000}
+.btn.w{background:var(--r)}
+main{padding:12px;max-width:960px;margin:auto}
+.card{background:var(--c);border:1px solid var(--l);border-radius:6px;padding:12px;margin-bottom:10px}
+.cl{display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px}.tabs .btn{flex:none}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th,td{border-bottom:1px solid var(--l);padding:5px;text-align:left;white-space:nowrap}
+td input,td select{width:100%;min-width:90px;padding:7px;border:1px solid var(--l);border-radius:4px}
+td input.n{min-width:60px;width:68px}
+.mv{font-weight:700;color:var(--b)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+label.f{display:block;margin:8px 0 2px;font-weight:700}
+.f+input,.f+select{padding:8px;width:100%;border:1px solid var(--l);border-radius:4px}
+textarea{width:100%;min-height:120px;padding:8px;border:1px solid var(--l);border-radius:6px}
+small{color:var(--m)}
+h3{margin:14px 0 6px}
+#sheet{display:none}
+@media print{body>*:not(#sheet){display:none!important}#sheet{display:block}.fiche{page-break-after:always;padding:10mm;font-family:Georgia,serif}.fiche td,.fiche th{border:1px solid #888;padding:6px}}
+</style></head><body>
+<header><button class="btn s" id="bk" onclick="cur=null;render()">‹ Classes</button><h1 id="t">Moyennes</h1></header>
+<main id="app"></main><div id="sheet"></div>
+<script>
+const $=s=>document.querySelector(s),KEY='moyennes-v1';
+const E=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,8);
+const S2=['Français','Histoire-Géo','Anglais','Allemand','Espagnol','Philosophie','Mathématiques','PCT','SVT','EPS','Conduite'];
+const S1=['Français','Anglais','Mathématiques','SVT','PCT','Histoire-Géo','EPS','Conduite'];
+const mk=(school,name,reg,ca,cyc,ps)=>({id:uid(),school,name,reg,ca,ps:!!ps,pp:false,mode:'A',students:[],subj:(cyc==2?S2:S1).map(n=>({n,c:1})),data:{},oth:{}});
+const DEF=()=>{const D='CEG DOWA',P='CPEG « Point du Jour »',S='CSEB';return[
+mk(D,'6èM7','S',1,1),mk(D,'6èM10','S',1,1),mk(D,'5èM2','S',1,1),mk(D,'4èM11','S',2,1),mk(D,'2nde D3','S',2,2),mk(D,'Tle A α','S',3,2,1),
+mk(P,'4è','T',2,1),mk(S,'1ère A&D','T',2,2),mk(S,'Tle A&D','T',2,2)]};
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.classes)return s}catch(e){}return{classes:DEF()}}
+let D=load(),cur=null,tab='notes',per=0;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}};
+const cl=()=>D.classes.find(c=>c.id==cur);
+const pn=c=>c.reg=='S'?['Semestre 1','Semestre 2']:['Trimestre 1','Trimestre 2','Trimestre 3'];
+const f=n=>n==null?'—':n.toFixed(2).replace('.',',');
+const num=x=>{const v=parseFloat(String(x??'').replace(',','.'));return isNaN(v)||v<0||v>20?null:v};
+const parse=s=>String(s||'').replace(/,/g,'.').split(/[\s;]+/).map(parseFloat).filter(x=>!isNaN(x)&&x>=0&&x<=20);
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+const SJ=c=>c.pp?c.subj:c.subj.filter(j=>j.n=='Anglais');
+const O=(c,p,id)=>(c.oth[p]||{})[id]||{};
+function moyEng(c,p,id){const d=(c.data[p]||{})[id]||{},I=parse(d.i),Dv=parse(d.d);
+ return c.mode=='A'?avg([...(I.length?[avg(I)]:[]),...Dv]):avg([...I,...Dv])}
+const val=(c,p,s,j)=>j.n=='Anglais'?moyEng(c,p,s.id):num(O(c,p,s.id)[j.n]);
+const cf=(c,s,j)=>j.n=='Anglais'?(+s.ca||+c.ca):+j.c;
+function mg(c,p,s){let a=0,b=0;c.subj.forEach(j=>{const v=val(c,p,s,j);if(v!=null){a+=v*cf(c,s,j);b+=cf(c,s,j)}});return b?a/b:null}
+function rk(c){const a=c.students.map(s=>({id:s.id,mg:mg(c,per,s)})),v=a.filter(x=>x.mg!=null).map(x=>x.mg).sort((x,y)=>y-x),r={};
+ a.forEach(x=>r[x.id]={mg:x.mg,r:x.mg==null?'':v.indexOf(x.mg)+1});return r}
+function render(){$('#app').innerHTML=cur?viewC():viewH();$('#t').textContent=cur?cl().name:'Moyennes';$('#bk').style.display=cur?'':'none'}
+function viewH(){const g={};D.classes.forEach(c=>(g[c.school]=g[c.school]||[]).push(c));
+ return Object.keys(g).map(s=>`<h3>${E(s)}</h3>`+g[s].map(c=>`<div class="card cl" onclick="openC('${c.id}')"><div><b>${E(c.name)}</b><br><small>${c.reg=='S'?'Semestriel':'Trimestriel'}, ${c.students.length} élèves${c.pp?', prof. principal':''}</small></div><span>›</span></div>`).join('')).join('')
+ +`<div class="row"><button class="btn s" onclick="addC()">Ajouter une classe</button><button class="btn s" onclick="expJ()">Sauvegarder</button><label class="btn s">Restaurer<input type="file" accept=".json" hidden onchange="impJ(this)"></label></div>`}
+function openC(id){cur=id;tab='notes';per=0;render()}
+function viewC(){const c=cl(),P=pn(c);
+ const T=[['notes','Anglais'],c.pp&&['cah','Cahier'],['el','Élèves'],['set','Réglages']].filter(Boolean);
+ return`<div class="row"><select onchange="per=+this.value;render()">${P.map((p,i)=>`<option value="${i}" ${i==per?'selected':''}>${p}</option>`).join('')}</select></div><div class="tabs">`
+ +T.map(([k,l])=>`<button class="btn s ${tab==k?'on':''}" onclick="tab='${k}';render()">${l}</button>`).join('')+'</div>'
+ +({notes:vN,cah:vK,el:vE,set:vR}[tab]||vN)(c)}
+const bar=c=>`<div class="row"><button class="btn s" onclick="csv()">Télécharger (CSV)</button><button class="btn s" onclick="fiche()">Imprimer les fiches</button></div>`;
+function vN(c){if(!c.students.length)return'<div class="card">Aucun élève. Ajoute la liste dans l’onglet Élèves.</div>';
+ return`<div class="card wrap"><table><tr><th>Élève</th><th>Interros</th><th>Devoirs</th><th>Moy.</th></tr>`+c.students.map(s=>{const d=(c.data[per]||{})[s.id]||{};
+ return`<tr><td>${E(s.n)}</td><td><input placeholder="12 14,5" value="${E(d.i)}" oninput="setN('i','${s.id}',this.value)"></td><td><input placeholder="15 9" value="${E(d.d)}" oninput="setN('d','${s.id}',this.value)"></td><td class="mv" id="m${s.id}">${f(moyEng(c,per,s.id))}</td></tr>`}).join('')
+ +`</table><small>Notes sur 20, séparées par un espace.</small></div>`+bar(c)}
+function setN(k,id,v){const c=cl();c.data[per]=c.data[per]||{};c.data[per][id]=c.data[per][id]||{};c.data[per][id][k]=v;save();
+ const e=$('#m'+id);if(e)e.textContent=f(moyEng(c,per,id));upd(c)}
+function upd(c){if(tab!='cah')return;const R=rk(c);c.students.forEach(s=>{const g=$('#g'+s.id),r=$('#r'+s.id),a=$('#a'+s.id);if(g)g.textContent=f(R[s.id].mg);if(r)r.textContent=R[s.id].r;if(a)a.textContent=f(moyEng(c,per,s.id))})}
+function vK(c){if(!c.students.length)return vN(c);const R=rk(c);
+ return`<div class="card wrap"><table><tr><th>Élève</th>${c.subj.map(j=>`<th>${E(j.n)}<br><small>coef ${j.n=='Anglais'?c.ca:j.c}</small></th>`).join('')}<th>Moy. gén.</th><th>Rang</th></tr>`
+ +c.students.map(s=>`<tr><td>${E(s.n)}</td>`+c.subj.map((j,i)=>j.n=='Anglais'?`<td class="mv" id="a${s.id}">${f(moyEng(c,per,s.id))}</td>`:`<td><input class="n" value="${E(O(c,per,s.id)[j.n])}" oninput="setO('${s.id}',${i},this.value)"></td>`).join('')
+ +`<td class="mv" id="g${s.id}">${f(R[s.id].mg)}</td><td id="r${s.id}">${R[s.id].r}</td></tr>`).join('')
+ +`</table><small>L’anglais vient de l’onglet Anglais. Saisis seulement les moyennes des autres matières.</small></div>`+bar(c)}
+function setO(id,i,v){const c=cl(),n=c.subj[i].n;c.oth[per]=c.oth[per]||{};c.oth[per][id]=c.oth[per][id]||{};c.oth[per][id][n]=v;save();upd(c)}
+function vE(c){return`<div class="card"><b>Importer les noms</b><br><small>Copie la colonne des noms depuis ton fichier Word, colle-la ici (un nom par ligne), ou charge un fichier .txt ou .csv.</small><textarea id="nm" placeholder="Un nom par ligne"></textarea><div class="row"><button class="btn" onclick="addS()">Ajouter</button><label class="btn s">Charger un fichier<input type="file" accept=".txt,.csv" hidden onchange="fileS(this)"></label><button class="btn s" onclick="sortS(true)">Trier A à Z</button></div><label><input type="checkbox" ${c.auto!==false?'checked':''} onchange="setF('auto',this.checked)"> Tri alphabétique automatique à chaque ajout ou modification de nom</label></div>`
+ +(c.students.length?`<div class="card wrap"><table>`+c.students.map((s,i)=>`<tr><td>${i+1}</td><td><input value="${E(s.n)}" onchange="renS('${s.id}',this.value)"></td>${c.ps?`<td><select onchange="setCa('${s.id}',this.value)">${[['3','LV1 (3)'],['2','LV2 (2)']].map(([v,l])=>`<option value="${v}" ${(+s.ca||+c.ca)==v?'selected':''}>${l}</option>`).join('')}</select></td>`:''}<td><button class="btn w" onclick="delS('${s.id}')">✕</button></td></tr>`).join('')+`</table></div>`:'')}
+function addS(){const c=cl();const L=$('#nm').value.split(/\r?\n/).map(x=>x.replace(/\t/g,' ').replace(/^\s*\d+[.)\-\s]+/,'').trim()).filter(Boolean);
+ L.forEach(n=>c.students.push({id:uid(),n}));if(c.auto!==false)sortS();save();render()}
+function fileS(i){const r=new FileReader();r.onload=()=>{$('#nm').value=r.result};if(i.files[0])r.readAsText(i.files[0])}
+function sortS(r){const c=cl();c.students.sort((a,b)=>a.n.localeCompare(b.n,'fr',{sensitivity:'base'}));if(r){save();render()}}
+function renS(id,v){const c=cl(),s=c.students.find(x=>x.id==id);v=v.trim();if(!v){render();return}s.n=v;if(c.auto!==false)sortS();save();render()}
+function setCa(id,v){cl().students.find(s=>s.id==id).ca=+v;save()}
+function delS(id){if(confirm('Supprimer cet élève et ses notes ?')){const c=cl();c.students=c.students.filter(s=>s.id!=id);save();render()}}
+const sel=(a,v,h)=>`<select onchange="${h}">${a.map(([k,l])=>`<option value="${k}" ${k==v?'selected':''}>${l}</option>`).join('')}</select>`;
+function vR(c){const co=[1,2,3,4,5,6].map(x=>[x,x]);
+ return`<div class="card"><label class="f">Nom de la classe</label><input value="${E(c.name)}" onchange="setF('name',this.value)">
+<label class="f">Régime</label>${sel([['S','Semestriel'],['T','Trimestriel']],c.reg,"setF('reg',this.value)")}
+<label class="f">Coefficient d’anglais</label>${sel(co,c.ca,"setF('ca',+this.value)")}
+<label class="f">Calcul de la moyenne d’anglais</label>${sel([['A','(moyenne des interros + devoirs) ÷ nombre'],['B','moyenne de toutes les notes']],c.mode,"setF('mode',this.value)")}
+<label class="f"><input type="checkbox" ${c.ps?'checked':''} onchange="setF('ps',this.checked)"> Coefficient d’anglais par élève (LV1 ou LV2)</label>
+<label class="f"><input type="checkbox" ${c.pp?'checked':''} onchange="setPP(this.checked)"> Je suis professeur principal de cette classe</label></div>`
+ +(c.pp?`<div class="card wrap"><b>Matières du cahier</b><table>`+c.subj.map((j,i)=>`<tr><td><input value="${E(j.n)}" ${j.n=='Anglais'?'disabled':''} onchange="setSn(${i},this.value)"></td><td>${sel(co,j.n=='Anglais'?c.ca:j.c,`setSc(${i},+this.value)`)}</td><td>${j.n=='Anglais'?'':`<button class="btn w" onclick="delSj(${i})">✕</button>`}</td></tr>`).join('')+`</table><div class="row"><button class="btn s" onclick="addSj()">Ajouter une matière</button></div></div>`:'')
+ +`<button class="btn w" onclick="delC()">Supprimer cette classe</button>`}
+function setF(k,v){const c=cl();c[k]=v;if(k=='reg')per=0;save();render()}
+function setPP(v){const c=cl();c.pp=v;if(!v&&tab=='cah')tab='notes';save();render()}
+function setSn(i,v){cl().subj[i].n=v.trim()||cl().subj[i].n;save()}
+function setSc(i,v){const c=cl();if(c.subj[i].n=='Anglais')c.ca=v;else c.subj[i].c=v;save();render()}
+function addSj(){const n=prompt('Nom de la matière');if(n){cl().subj.push({n:n.trim(),c:1});save();render()}}
+function delSj(i){cl().subj.splice(i,1);save();render()}
+function addC(){const n=prompt('Nom de la classe (ex. 3èM1)');if(!n)return;const s=prompt('Établissement')||'Autre';
+ const reg=confirm('Régime semestriel ?\nOK = semestriel, Annuler = trimestriel')?'S':'T',cy=confirm('Second cycle (2nde à Tle) ?')?2:1;
+ const c=mk(s,n,reg,1,cy);D.classes.push(c);save();render()}
+function delC(){if(confirm('Supprimer cette classe et toutes ses notes ?')){D.classes=D.classes.filter(c=>c.id!=cur);cur=null;save();render()}}
+function dl(t,n,m,bom){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([(bom?'\ufeff':'')+t],{type:m}));a.download=n;a.click()}
+function csv(){const c=cl(),R=rk(c),S=SJ(c),q=x=>x==null?'':x.toFixed(2).replace('.',',');
+ const rows=[['Élève',...S.map(j=>j.n),'Moyenne générale','Rang']];
+ c.students.forEach(s=>rows.push([s.n,...S.map(j=>q(val(c,per,s,j))),c.pp?q(R[s.id].mg):'',c.pp?R[s.id].r:'']));
+ dl(rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(';')).join('\n'),`${c.name}-${pn(c)[per]}.csv`,'text/csv',1)}
+function fiche(){const c=cl(),R=rk(c),S=SJ(c);
+ $('#sheet').innerHTML=c.students.map(s=>`<div class="fiche"><h2>${E(c.school)}, ${E(c.name)}</h2><h3>${E(s.n)}, ${pn(c)[per]}</h3><table><tr><th>Matière</th><th>Coef</th><th>Moyenne /20</th></tr>`
+ +S.map(j=>`<tr><td>${E(j.n)}</td><td>${cf(c,s,j)}</td><td>${f(val(c,per,s,j))}</td></tr>`).join('')+`</table>`
+ +(c.pp?`<p><b>Moyenne générale : ${f(R[s.id].mg)}</b>, rang ${R[s.id].r||'—'}/${c.students.length}</p>`:'')+`</div>`).join('');print()}
+function expJ(){dl(JSON.stringify(D),'moyennes-sauvegarde.json','application/json')}
+function impJ(i){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.classes){D=d;save();render()}}catch(e){alert('Fichier invalide')}};if(i.files[0])r.readAsText(i.files[0])}
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+render();
+</script></body></html>
